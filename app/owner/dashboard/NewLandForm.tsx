@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { supabase } from "@/lib/supabaseClient";
-
-const OWNER_ID = "d7175308-e080-4465-b6cc-e516331a7aab";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function NewLandForm() {
+  const supabase = createSupabaseBrowserClient();
+
   const [title, setTitle] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
@@ -39,9 +39,27 @@ export default function NewLandForm() {
       return;
     }
 
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData.user) {
+      setError("Arazi eklemek için giriş yapmalısın.");
+      setLoading(false);
+      return;
+    }
+
+    const user = userData.user;
+    const role = user.user_metadata?.role;
+
+    if (role !== "owner") {
+      setError("Arazi eklemek için arazi sahibi hesabı ile giriş yapmalısın.");
+      setLoading(false);
+      return;
+    }
+
+    const ownerId = user.id;
+
     const { error: insertError } = await supabase.from("lands").insert([
       {
-        owner_id: OWNER_ID,
+        owner_id: ownerId,
         title,
         city,
         district: district || null,
@@ -57,7 +75,7 @@ export default function NewLandForm() {
       console.error(insertError);
       setError("Kayıt eklenirken bir hata oluştu.");
     } else {
-      setMessage("Arazi başarıyla eklendi! /lands sayfasından görebilirsin.");
+      setMessage("Arazi başarıyla eklendi! Sayfayı yenilersen listede görürsün.");
       setTitle("");
       setCity("");
       setDistrict("");
@@ -72,116 +90,50 @@ export default function NewLandForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-3 rounded-xl bg-white p-4 shadow-sm"
-    >
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
       <h2 className="text-base font-semibold">Yeni Arazi Ekle</h2>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700">
-          Başlık *
-        </label>
-        <input
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="Örn: Bornova'da 10 dönüm sulak arazi"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+        <label className="block text-xs font-medium text-slate-700">Başlık *</label>
+        <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <label className="block text-xs font-medium text-slate-700">
-            Şehir *
-          </label>
-          <input
-            className="mt-1 w-full rounded border px-2 py-1 text-sm"
-            placeholder="İzmir"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-          />
+          <label className="block text-xs font-medium text-slate-700">Şehir *</label>
+          <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={city} onChange={(e) => setCity(e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700">
-            İlçe
-          </label>
-          <input
-            className="mt-1 w-full rounded border px-2 py-1 text-sm"
-            placeholder="Bornova"
-            value={district}
-            onChange={(e) => setDistrict(e.target.value)}
-          />
+          <label className="block text-xs font-medium text-slate-700">İlçe</label>
+          <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={district} onChange={(e) => setDistrict(e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700">
-            Büyüklük (dekar) *
-          </label>
-          <input
-            type="number"
-            step="0.1"
-            className="mt-1 w-full rounded border px-2 py-1 text-sm"
-            placeholder="10"
-            value={sizeDekar}
-            onChange={(e) => setSizeDekar(e.target.value)}
-          />
+          <label className="block text-xs font-medium text-slate-700">Büyüklük (dekar) *</label>
+          <input type="number" step="0.1" className="mt-1 w-full rounded border px-2 py-1 text-sm" value={sizeDekar} onChange={(e) => setSizeDekar(e.target.value)} />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700">
-          Toprak tipi
-        </label>
-        <input
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="Killi-tınlı, tınlı vb."
-          value={soilType}
-          onChange={(e) => setSoilType(e.target.value)}
-        />
+        <label className="block text-xs font-medium text-slate-700">Toprak tipi</label>
+        <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={soilType} onChange={(e) => setSoilType(e.target.value)} />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700">
-          Sulama durumu
-        </label>
-        <input
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="Sondaj, kanal, yağmur suyu vb."
-          value={irrigation}
-          onChange={(e) => setIrrigation(e.target.value)}
-        />
+        <label className="block text-xs font-medium text-slate-700">Sulama durumu</label>
+        <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={irrigation} onChange={(e) => setIrrigation(e.target.value)} />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700">
-          Uygun ürünler (virgülle ayır)
-        </label>
-        <input
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="zeytin, sebze, üzüm..."
-          value={suitableFor}
-          onChange={(e) => setSuitableFor(e.target.value)}
-        />
+        <label className="block text-xs font-medium text-slate-700">Uygun ürünler (virgülle ayır)</label>
+        <input className="mt-1 w-full rounded border px-2 py-1 text-sm" value={suitableFor} onChange={(e) => setSuitableFor(e.target.value)} />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700">
-          Açıklama
-        </label>
-        <textarea
-          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          rows={3}
-          placeholder="Araziye dair detaylı açıklama..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+        <label className="block text-xs font-medium text-slate-700">Açıklama</label>
+        <textarea className="mt-1 w-full rounded border px-2 py-1 text-sm" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-      >
+      <button type="submit" disabled={loading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
         {loading ? "Kaydediliyor..." : "Araziyi Kaydet"}
       </button>
 

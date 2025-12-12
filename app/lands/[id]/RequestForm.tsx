@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { supabase } from "@/lib/supabaseClient";
-
-// Buraya Supabase'teki entrepreneur profilinin UUID'sini yapıştır:
-const ENTREPRENEUR_ID = "BURAYA_GIRISIMCI_UUID_GELECEK";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function RequestForm({ landId }: { landId: string }) {
+  const supabase = createSupabaseBrowserClient();
+
   const [targetProduct, setTargetProduct] = useState("");
   const [budgetRange, setBudgetRange] = useState("");
   const [preferredCity, setPreferredCity] = useState("");
@@ -28,9 +27,25 @@ export default function RequestForm({ landId }: { landId: string }) {
       return;
     }
 
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData.user) {
+      setError("Talep oluşturmak için giriş yapmalısın.");
+      setLoading(false);
+      return;
+    }
+
+    const userId = userData.user.id;
+    const role = userData.user.user_metadata?.role;
+
+    if (role !== "entrepreneur") {
+      setError("Talep oluşturmak için girişimci hesabı ile giriş yapmalısın.");
+      setLoading(false);
+      return;
+    }
+
     const { error: insertError } = await supabase.from("requests").insert([
       {
-        entrepreneur_id: ENTREPRENEUR_ID,
+        entrepreneur_id: userId,
         land_id: landId,
         target_product: targetProduct,
         budget_range: budgetRange || null,
@@ -55,13 +70,13 @@ export default function RequestForm({ landId }: { landId: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {/* aynı inputlar */}
       <div>
         <label className="block text-xs font-medium text-slate-700">
           Hedef ürün / üretim planı *
         </label>
         <input
           className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="Zeytin, sebze, üzüm vb."
           value={targetProduct}
           onChange={(e) => setTargetProduct(e.target.value)}
         />
@@ -73,7 +88,6 @@ export default function RequestForm({ landId }: { landId: string }) {
         </label>
         <input
           className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="Örn: 100k-250k"
           value={budgetRange}
           onChange={(e) => setBudgetRange(e.target.value)}
         />
@@ -85,7 +99,6 @@ export default function RequestForm({ landId }: { landId: string }) {
         </label>
         <input
           className="mt-1 w-full rounded border px-2 py-1 text-sm"
-          placeholder="İzmir, Manisa vb."
           value={preferredCity}
           onChange={(e) => setPreferredCity(e.target.value)}
         />
@@ -98,7 +111,6 @@ export default function RequestForm({ landId }: { landId: string }) {
         <textarea
           className="mt-1 w-full rounded border px-2 py-1 text-sm"
           rows={3}
-          placeholder="Beklentilerin, süre, ortaklık modeli vb."
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />

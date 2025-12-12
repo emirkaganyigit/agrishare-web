@@ -1,8 +1,8 @@
 // app/owner/dashboard/page.tsx
-import { supabase } from "@/lib/supabaseClient";
+import { redirect } from "next/navigation";
 import NewLandForm from "./NewLandForm";
-
-const OWNER_ID = "d7175308-e080-4465-b6cc-e516331a7aab";
+import RequestActions from "./RequestActions";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type LandRow = {
   id: string;
@@ -13,6 +13,8 @@ type LandRow = {
   created_at: string;
 };
 
+type Status = "pending" | "accepted" | "rejected";
+
 type RequestRow = {
   id: string;
   land_id: string | null;
@@ -22,6 +24,7 @@ type RequestRow = {
   preferred_city: string | null;
   note: string | null;
   created_at: string;
+  status: Status;
 };
 
 type EntrepreneurProfile = {
@@ -31,7 +34,11 @@ type EntrepreneurProfile = {
   phone: string | null;
 };
 
-async function getOwnerLands(ownerId: string): Promise<LandRow[]> {
+// ✅ async createSupabaseServerClient() döndüğü için:
+// Supabase tipini Awaited<ReturnType<...>> ile alıyoruz
+type SupabaseServer = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+async function getOwnerLands(supabase: SupabaseServer, ownerId: string): Promise<LandRow[]> {
   const { data, error } = await supabase
     .from("lands")
     .select("id, title, city, district, size_dekar, created_at")
@@ -42,16 +49,21 @@ async function getOwnerLands(ownerId: string): Promise<LandRow[]> {
     console.error("getOwnerLands error:", error);
     return [];
   }
-  return (data ?? []) as LandRow[];
+
+  // TS bazen supabase tiplerini daraltamaz; bu cast güvenli
+  return (data ?? []) as unknown as LandRow[];
 }
 
-async function getRequestsForLandIds(landIds: string[]): Promise<RequestRow[]> {
+async function getRequestsForLandIds(
+  supabase: SupabaseServer,
+  landIds: string[]
+): Promise<RequestRow[]> {
   if (landIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from("requests")
     .select(
-      "id, land_id, entrepreneur_id, target_product, budget_range, preferred_city, note, created_at"
+      "id, land_id, entrepreneur_id, target_product, budget_range, preferred_city, note, created_at, status"
     )
     .in("land_id", landIds)
     .order("created_at", { ascending: false });
@@ -60,10 +72,14 @@ async function getRequestsForLandIds(landIds: string[]): Promise<RequestRow[]> {
     console.error("getRequestsForLandIds error:", error);
     return [];
   }
-  return (data ?? []) as RequestRow[];
+
+  return (data ?? []) as unknown as RequestRow[];
 }
 
-async function getEntrepreneursByIds(ids: string[]): Promise<EntrepreneurProfile[]> {
+async function getEntrepreneursByIds(
+  supabase: SupabaseServer,
+  ids: string[]
+): Promise<EntrepreneurProfile[]> {
   if (ids.length === 0) return [];
 
   const { data, error } = await supabase
@@ -75,21 +91,34 @@ async function getEntrepreneursByIds(ids: string[]): Promise<EntrepreneurProfile
     console.error("getEntrepreneursByIds error:", error);
     return [];
   }
-  return (data ?? []) as EntrepreneurProfile[];
+
+  return (data ?? []) as unknown as EntrepreneurProfile[];
 }
 
 export default async function OwnerDashboardPage() {
-  const lands = await getOwnerLands(OWNER_ID);
+  // ✅ burası kritik: await!
+  const supabase = await createSupabaseServerClient();
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  const user = userData?.user;
+
+  if (userErr) console.error("auth.getUser error:", userErr);
+  if (!user) redirect("/auth");
+
+  const role = user.user_metadata?.role;
+  if (role !== "owner") redirect("/entrepreneur/dashboard");
+
+  const ownerId = user.id;
+
+  const lands = await getOwnerLands(supabase, ownerId);
   const landIds = lands.map((l) => l.id);
 
-  const requests = await getRequestsForLandIds(landIds);
-
-  const entrepreneurIds = Array.from(
-    new Set(requests.map((r) => r.entrepreneur_id))
-  );
-  const entrepreneurs = await getEntrepreneursByIds(entrepreneurIds);
+  const requests = await getRequestsForLandIds(supabase, landIds);
+  const entrepreneurIds = Array.from(new Set(requests.map((r) => r.entrepreneur_id)));
+  const entrepreneurs = await getEntrepreneursByIds(supabase, entrepreneurIds);
 
   const entrepreneurMap = new Map(entrepreneurs.map((e) => [e.id, e]));
+
   const requestsByLand = new Map<string, RequestRow[]>();
   for (const r of requests) {
     if (!r.land_id) continue;
@@ -128,8 +157,7 @@ export default async function OwnerDashboardPage() {
                   <div className="font-semibold">{land.title}</div>
                   <div className="text-xs text-slate-600">
                     {land.city}
-                    {land.district ? ` / ${land.district}` : ""} •{" "}
-                    {land.size_dekar} dekar
+                    {land.district ? ` / ${land.district}` : ""} • {land.size_dekar} dekar
                   </div>
                 </div>
 
@@ -156,16 +184,17 @@ export default async function OwnerDashboardPage() {
                       const ent = entrepreneurMap.get(req.entrepreneur_id) ?? null;
 
                       return (
-                        <div
-                          key={req.id}
-                          className="rounded-lg border p-3 text-xs"
-                        >
-                          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                            <div className="font-semibold">
-                              {req.target_product}
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                              {new Date(req.created_at).toLocaleString("tr-TR")}
+                        <div key={req.id} className="rounded-lg border p-3 text-xs">
+                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div className="font-semibold">{req.target_product}</div>
+
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end md:gap-3">
+                              <RequestActions requestId={req.id} currentStatus={req.status} />
+                              <div className="text-[11px] text-slate-500">
+                                {new Date(req.created_at).toLocaleString("tr-TR", {
+                                  timeZone: "Europe/Istanbul",
+                                })}
+                              </div>
                             </div>
                           </div>
 
@@ -180,9 +209,7 @@ export default async function OwnerDashboardPage() {
                             <div className="mt-1 text-slate-700">
                               {req.budget_range ? `Bütçe: ${req.budget_range}` : ""}
                               {req.budget_range && req.preferred_city ? " • " : ""}
-                              {req.preferred_city
-                                ? `Tercih: ${req.preferred_city}`
-                                : ""}
+                              {req.preferred_city ? `Tercih: ${req.preferred_city}` : ""}
                             </div>
                           )}
 
