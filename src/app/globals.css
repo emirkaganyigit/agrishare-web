@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f7f9f5;
+  color: #173d2c;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hero-bg {
+  background:
+    linear-gradient(90deg, rgba(8, 48, 30, .96),
+    rgba(8, 48, 30, .75), rgba(8, 48, 30, .2)),
+    url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85");
+  background-size: cover;
+  background-position: center;
+}

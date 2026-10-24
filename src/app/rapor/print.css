@@ -1,0 +1,65 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body:has(#agrishare-report) {
+    background: white !important;
+    color: #111 !important;
+  }
+
+  body:has(#agrishare-report) header,
+  body:has(#agrishare-report) footer,
+  body:has(#agrishare-report) nav,
+  #agrishare-report .report-no-print {
+    display: none !important;
+  }
+
+  #agrishare-report {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #agrishare-report .report-document {
+    margin-top: 0 !important;
+  }
+
+  #agrishare-report .report-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  #agrishare-report table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #agrishare-report tr {
+    break-inside: avoid;
+  }
+
+  #agrishare-report .report-document > :first-child {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+@media print {
+  #agrishare-report .report-section:has(.report-no-print):not(:has(.report-ai-content)) {
+    display: none !important;
+  }
+
+  #agrishare-report .report-document > :first-child {
+    background: white !important;
+    color: black !important;
+    border-bottom: 2px solid #166534;
+  }
+
+  #agrishare-report .report-document > :first-child * {
+    color: black !important;
+  }
+}

@@ -39,3 +39,37 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.env.local
+
+# Agrishare - local secrets
+.env*
+!.env.example
+
+# Next.js / Node.js
+/node_modules/
+/.next/
+/out/
+/build/
+/coverage/
+/.vercel/
+*.tsbuildinfo
+npm-debug.log*
+*.pem
+
+# Previous sprint backups
+/src.backup-*/
+*.bak
+*.backup
+
+# Editor / OS
+.DS_Store
+.idea/
+
+.env*
+!.env.example
+node_modules/
+.next/
+.vercel/
+src.backup-*/
+*.bak
